@@ -1,6 +1,6 @@
 # DevSecOps
 
-A full-stack app for managing **encrypted credentials**, **security scanners**, and **scan runs** (SAST and container-oriented flows). It includes a React dashboard and an Express API backed by MongoDB.
+A full-stack app for managing **encrypted credentials**, **security scanners**, and **scan runs** (SAST, container image, and AWS cloud flows). It includes a React dashboard and an Express API backed by MongoDB.
 
 ## What’s in the repo
 
@@ -11,10 +11,27 @@ A full-stack app for managing **encrypted credentials**, **security scanners**, 
 
 ## Features
 
-- **Accounts** — Sign up, log in; API routes primage.pngotected with JWT.
+- **Accounts** — Sign up, log in; API routes protected with JWT.
 - **Secrets** — Store and edit secrets; sensitive values are encrypted at rest (`CREDENTIALS_ENCRYPTION_KEY`).
 - **Scanners** — Create and manage scanner configurations, list branches for Git-based SAST setups, trigger scans, and view reports / scan state.
 - **API** — REST-style routes under `/api` (auth, secrets, scanners, git helpers, health).
+
+## Scanner types
+
+- **Container image** (`docker`)
+  - Generates reports via **POST** `/api/scanners/:scannerId/run`
+- **SAST (repository)** (`sast`)
+  - Generates reports via **POST** `/api/scanners/:scannerId/run`
+- **AWS cloud** (`aws`)
+  - Generates reports via **POST** `/api/scanners/:scannerId/run`
+  - **Required scanner config**:
+    - `cloudConfig.region`: AWS region (example: `us-east-1`)
+    - `cloudConfig.services`: non-empty array of service IDs (example: `["iam", "s3"]`)
+    - `secretId`: must reference an active AWS secret
+  - **Required secret config** (type `aws`):
+    - `credentials.accessKey`
+    - `credentials.secretKey`
+  - If any of these are missing/invalid, the API returns a `400` with a helpful message (for example: `cloudConfig.region is required`).
 
 ## Prerequisites
 
