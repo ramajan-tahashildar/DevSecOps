@@ -12,8 +12,6 @@ function emptyForm(type) {
   return {
     name: "",
     type,
-    isActive: true,
-    tagsInput: "",
     secretId: "",
     sastPrivateRepo: false,
     repoUrl: "",
@@ -36,8 +34,6 @@ function formFromScanner(d) {
   return {
     name: d.name || "",
     type,
-    isActive: d.isActive !== false,
-    tagsInput: Array.isArray(d.tags) ? d.tags.join(", ") : "",
     secretId: d.secretId || "",
     sastPrivateRepo: type === "sast" ? Boolean(d.secretId) : false,
     repoUrl: src.repoUrl || "",
@@ -52,15 +48,9 @@ function formFromScanner(d) {
 }
 
 function buildPayload(form) {
-  const tags = form.tagsInput
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
   const base = {
     name: form.name.trim(),
     type: form.type,
-    tags,
-    isActive: form.isActive,
   };
 
   if (form.type === "sast") {
@@ -178,7 +168,6 @@ export function ScannerEditor() {
     setForm((prev) => {
       const next = emptyForm(type);
       next.name = prev.name;
-      next.tagsInput = prev.tagsInput;
       next.secretId = prev.secretId;
       next.sastPrivateRepo = type === "sast" ? prev.sastPrivateRepo : false;
       return next;
@@ -293,27 +282,6 @@ export function ScannerEditor() {
         {!isCreate ? (
           <p className="muted small">Type cannot be changed after create; add a new scanner to switch type.</p>
         ) : null}
-
-        <div className="field">
-          <span>Active</span>
-          <label className="inline-check">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => set("isActive", e.target.checked)}
-            />
-            <span className="muted">Scanner is enabled</span>
-          </label>
-        </div>
-
-        <label className="field">
-          <span>Tags (comma-separated)</span>
-          <input
-            value={form.tagsInput}
-            onChange={(e) => set("tagsInput", e.target.value)}
-            placeholder="team-a, ci"
-          />
-        </label>
 
         {form.type === "sast" ? (
           <>

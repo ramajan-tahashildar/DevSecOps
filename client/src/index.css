@@ -448,8 +448,68 @@ a:hover {
   min-width: 0;
 }
 
-.dashboard__topbar-user {
-  font-size: 0.75rem;
+.dashboard__account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding-left: 1rem;
+  margin-left: 0.15rem;
+  border-left: 1px solid var(--border-strong);
+  min-width: 0;
+}
+
+.dashboard__account-heading {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard__account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.dashboard__account-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(94, 234, 212, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.32);
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.dashboard__account-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.dashboard__account-display {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard__account-email {
+  font-size: 0.6875rem;
   color: var(--muted);
   max-width: 220px;
   overflow: hidden;
@@ -571,6 +631,9 @@ a:hover {
   overflow: auto;
   padding: 1.35rem 1.5rem 1.75rem;
   max-width: none;
+  /* Shared height for list panels that pin pagination to the bottom (Scanner reports, Scanners, Secrets). */
+  --dashboard-pager-panel-height: calc(100vh - 10.75rem);
+  --dashboard-pager-panel-height: calc(100dvh - 10.75rem);
 }
 
 .dashboard-home {
@@ -637,8 +700,32 @@ a:hover {
     max-height: none;
   }
 
-  .dashboard__topbar-user {
-    max-width: 140px;
+  .dashboard__account {
+    align-items: flex-start;
+    width: 100%;
+    padding-left: 0;
+    margin-left: 0;
+    border-left: none;
+    border-top: 1px solid var(--border-strong);
+    padding-top: 0.65rem;
+    margin-top: 0.15rem;
+  }
+
+  .dashboard__account-text {
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dashboard__account-display,
+  .dashboard__account-email {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .dashboard__account-row {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .dashboard__main {
@@ -695,62 +782,108 @@ a:hover {
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
-/* Scanner detail: pin pagination to bottom of panel; list scrolls when needed */
+/* Scanner detail: column layout for header + reports block */
 .scanner-reports-panel {
   display: flex;
   flex-direction: column;
 }
 
-/* Fixed viewport-relative height so inner grid gets a definite size (flex:1 alone was shrink-wrapping). */
-.scanner-reports-panel--fill {
-  --scanner-reports-panel-h: calc(100vh - 10.75rem);
-  --scanner-reports-panel-h: calc(100dvh - 10.75rem);
-  min-height: var(--scanner-reports-panel-h);
-  height: var(--scanner-reports-panel-h);
-  max-height: var(--scanner-reports-panel-h);
+/* Fixed height + flex column so list scrolls and pagination stays at bottom (same as Scanners / Secrets lists). */
+.panel.panel--list-pager-fill {
+  min-height: var(--dashboard-pager-panel-height);
+  height: var(--dashboard-pager-panel-height);
+  max-height: var(--dashboard-pager-panel-height);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-.scanner-reports-panel__reports-block {
+.panel.panel--list-pager-fill > .panel__head,
+.panel.panel--list-pager-fill > .form-error,
+.panel.panel--list-pager-fill > .scanner-reports__hint,
+.panel.panel--list-pager-fill > .scanner-banner {
+  flex-shrink: 0;
+}
+
+/* Stack: optional heading | scrollable list | pager (pager always last, same bar everywhere). */
+.list-pager-stack {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-/* Grow to fill space under header, then grid: title | scrollable list | pager (pager row always at bottom). */
-.scanner-reports-panel--fill .scanner-reports-panel__reports-block {
+.panel.panel--list-pager-fill .list-pager-stack--fill {
   flex: 1 1 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-content: stretch;
 }
 
-.scanner-reports-panel__list-area {
+.list-pager-stack__scroll {
   min-height: 0;
 }
 
-.scanner-reports-panel--fill .scanner-reports-panel__list-area {
+.panel.panel--list-pager-fill .list-pager-stack--fill > .list-pager-stack__scroll {
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
-  min-height: 0;
 }
 
-.scanner-reports__pager {
-  display: flex;
-  flex-wrap: wrap;
+/* Shared list pager (ScannerReports, ScannersList, SecretsList, …) */
+.list-pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem 1rem;
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
   flex-shrink: 0;
-  padding-top: 1rem;
+  padding: 0.85rem 0.15rem 0;
+  margin-top: 0;
   border-top: 1px solid var(--border);
 }
 
-.scanner-reports__pager-meta {
+.list-pagination > .btn:first-of-type {
+  justify-self: start;
+}
+
+.list-pagination__meta {
+  grid-column: 2;
+  justify-self: center;
   text-align: center;
-  min-width: 12rem;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.list-pagination > .btn:last-of-type {
+  grid-column: 3;
+  justify-self: end;
+}
+
+@media (max-width: 520px) {
+  .list-pagination {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .list-pagination > .btn:first-of-type {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .list-pagination > .btn:last-of-type {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .list-pagination__meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+  }
 }
 
 .scanner-banner {
@@ -772,8 +905,16 @@ a:hover {
   color: var(--danger);
 }
 
+.scanner-report-row__main {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .scanner-report-row__details {
   margin-top: 0.5rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .scanner-report-row__details summary {
@@ -789,7 +930,13 @@ a:hover {
   margin: 0.5rem 0 0;
   padding: 0.65rem 0.75rem;
   max-height: 280px;
-  overflow: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   font-size: 0.72rem;
   line-height: 1.45;
   background: #050810;
@@ -863,7 +1010,7 @@ a:hover {
 
 .scanners-page {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 1.25rem;
   min-width: 0;
 }
@@ -927,6 +1074,9 @@ a:hover {
 .scanners-page__main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 @media (max-width: 720px) {

@@ -11,7 +11,7 @@ A full-stack app for managing **encrypted credentials**, **security scanners**, 
 
 ## Features
 
-- **Accounts** — Sign up, log in; API routes protected with JWT.
+- **Accounts** — Sign up, log in; API routes primage.pngotected with JWT.
 - **Secrets** — Store and edit secrets; sensitive values are encrypted at rest (`CREDENTIALS_ENCRYPTION_KEY`).
 - **Scanners** — Create and manage scanner configurations, list branches for Git-based SAST setups, trigger scans, and view reports / scan state.
 - **API** — REST-style routes under `/api` (auth, secrets, scanners, git helpers, health).

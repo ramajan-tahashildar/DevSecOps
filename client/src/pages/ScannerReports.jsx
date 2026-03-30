@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import * as api from "../api";
+import { ListPagination } from "../components/ListPagination";
 import { SCANNER_TYPE_LABELS } from "../scannerTypes";
+import { parsePaginationFromResponse, shouldRenderPagination } from "../utils/pagination";
 
 const pendingScanKey = (scannerId) => `devsecops_scan_pending:${scannerId}`;
 
@@ -108,7 +110,7 @@ export function ScannerReports() {
       reportsPageRef.current = effectivePage;
 
       setReports(data);
-      setPagination(pag ?? null);
+      setPagination(pag ? parsePaginationFromResponse(pag) ?? null : null);
       setNewestHint(hintRes.data?.[0] ?? null);
       setReportsError("");
       return { hint: hintRes.data?.[0] ?? null, pagination: pag };
@@ -282,11 +284,11 @@ export function ScannerReports() {
     );
   }
 
-  const pagedTimeline = Boolean(pagination && pagination.total > 0);
+  const pagedTimeline = shouldRenderPagination(pagination);
 
   return (
     <div
-      className={`panel scanner-reports-panel${pagedTimeline ? " scanner-reports-panel--fill" : ""}`}
+      className={`panel scanner-reports-panel${pagedTimeline ? " panel--list-pager-fill" : ""}`}
     >
       <div className="panel__head panel__head--split">
         <div className="panel__head-start">
@@ -335,9 +337,9 @@ export function ScannerReports() {
       ) : null}
       {reportsError ? <p className="form-error">{reportsError}</p> : null}
 
-      <div className="scanner-reports-panel__reports-block">
+      <div className={`list-pager-stack${pagedTimeline ? " list-pager-stack--fill" : ""}`}>
         <h2 className="scanner-reports__heading">Reports</h2>
-        <div className="scanner-reports-panel__list-area">
+        <div className="list-pager-stack__scroll">
           {!reports.length &&
           !showProcessing &&
           runRow?.phase !== "failed" &&
@@ -417,29 +419,11 @@ export function ScannerReports() {
           )}
         </div>
 
-        {pagination && pagination.total > 0 ? (
-          <nav className="scanner-reports__pager" aria-label="Report pages">
-            <button
-              type="button"
-              className="btn btn--ghost btn--small"
-              disabled={!pagination.hasPrevPage}
-              onClick={() => goToTimelinePage(pagination.page - 1)}
-            >
-              Previous
-            </button>
-            <span className="scanner-reports__pager-meta muted small">
-              Page {pagination.page} of {pagination.totalPages} · {pagination.total} total
-            </span>
-            <button
-              type="button"
-              className="btn btn--ghost btn--small"
-              disabled={!pagination.hasNextPage}
-              onClick={() => goToTimelinePage(pagination.page + 1)}
-            >
-              Next
-            </button>
-          </nav>
-        ) : null}
+        <ListPagination
+          pagination={pagination}
+          onPageChange={goToTimelinePage}
+          ariaLabel="Report pages"
+        />
       </div>
     </div>
   );

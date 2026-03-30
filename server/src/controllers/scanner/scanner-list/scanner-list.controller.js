@@ -74,11 +74,6 @@ function pickCloudConfig(body) {
   return { value: out };
 }
 
-function normalizeTags(body) {
-  if (!Array.isArray(body?.tags)) return [];
-  return body.tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim());
-}
-
 /** True if client sent any repo/branch fields (docker & cloud scans must not use source). */
 function sourceHasRepoFields(s) {
   if (!s || typeof s !== "object") return false;
@@ -116,7 +111,6 @@ function toScannerResponse(doc) {
     dockerConfig: doc.dockerConfig || {},
     sastConfig: doc.sastConfig || {},
     cloudConfig: doc.cloudConfig || {},
-    tags: doc.tags || [],
     isActive: doc.isActive,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -207,10 +201,6 @@ function buildScannerPayload(body, { partial } = { partial: false }) {
     payload.cloudConfig = cc.value;
   }
 
-  if (!partial || body.tags !== undefined) {
-    payload.tags = normalizeTags(body);
-  }
-
   if (!partial || body.secretId !== undefined) {
     if (body.secretId === null || body.secretId === "") {
       payload.secretId = null;
@@ -220,13 +210,6 @@ function buildScannerPayload(body, { partial } = { partial: false }) {
       }
       payload.secretId = new ObjectId(body.secretId);
     }
-  }
-
-  if (!partial || body.isActive !== undefined) {
-    if (body.isActive !== undefined && typeof body.isActive !== "boolean") {
-      return { error: "isActive must be a boolean" };
-    }
-    if (body.isActive !== undefined) payload.isActive = body.isActive;
   }
 
   const docker = payload.dockerConfig || {};
@@ -260,7 +243,7 @@ export async function createScanner(req, res) {
       userId: new ObjectId(req.user.id),
       ...rest,
       ...(secretId ? { secretId } : {}),
-      isActive: built.value.isActive !== undefined ? built.value.isActive : true,
+      isActive: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -421,8 +404,6 @@ export async function updateScanner(req, res) {
     const $set = { updatedAt: now };
     if (updates.name !== undefined) $set.name = updates.name;
     if (updates.type !== undefined) $set.type = updates.type;
-    if (updates.tags !== undefined) $set.tags = updates.tags;
-    if (updates.isActive !== undefined) $set.isActive = updates.isActive;
     $set.source = mergedSource;
     if (updates.dockerConfig !== undefined) {
       $set.dockerConfig = { ...(existing.dockerConfig || {}), ...updates.dockerConfig };

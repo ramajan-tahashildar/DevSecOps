@@ -1,6 +1,22 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 
+function accountInitials(user) {
+  if (!user) return "?";
+  const a = (user.firstName || "").trim()[0] || "";
+  const b = (user.lastName || "").trim()[0] || "";
+  if (a || b) return `${a}${b}`.toUpperCase();
+  const e = (user.email || "?").trim();
+  return e[0].toUpperCase();
+}
+
+function accountDisplayName(user) {
+  if (!user) return "";
+  const parts = [user.firstName, user.lastName].filter(Boolean).map((s) => String(s).trim());
+  const full = parts.join(" ");
+  return full || user.email || "";
+}
+
 export function DashboardShell() {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
@@ -19,12 +35,31 @@ export function DashboardShell() {
             <span className="dashboard__topbar-tagline muted">Security console</span>
           </div>
           <div className="dashboard__topbar-right">
-            <span className="dashboard__topbar-user mono" title={user?.email}>
-              {user?.email}
-            </span>
-            <button type="button" className="btn btn--ghost btn--small dashboard__topbar-signout" onClick={signOut}>
-              Sign out
-            </button>
+            <section className="dashboard__account" aria-labelledby="dashboard-account-heading">
+              <p id="dashboard-account-heading" className="dashboard__account-heading muted">
+                My account
+              </p>
+              <div className="dashboard__account-row">
+                <div className="dashboard__account-text">
+                  <span className="dashboard__account-display" title={accountDisplayName(user)}>
+                    {accountDisplayName(user)}
+                  </span>
+                  <span className="dashboard__account-email mono" title={user?.email}>
+                    {user?.email}
+                  </span>
+                </div>
+                <div className="dashboard__account-avatar" aria-hidden>
+                  {accountInitials(user)}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--small dashboard__topbar-signout"
+                  onClick={signOut}
+                >
+                  Sign out
+                </button>
+              </div>
+            </section>
           </div>
         </header>
 

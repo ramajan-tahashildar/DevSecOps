@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "../api";
+import { ListPagination } from "../components/ListPagination";
 import { useConfirm } from "../components/ConfirmDialog";
 import { SCANNER_TYPE_LABELS, SCANNER_TYPES } from "../scannerTypes";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  clampPageToTotalPages,
+  parsePaginationFromResponse,
+  shouldRenderPagination,
+} from "../utils/pagination";
 
 export function ScannersList() {
   const confirm = useConfirm();
   const [filterType, setFilterType] = useState(null);
+  const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
+  /** @type {import("../utils/pagination").ApiPagination | null} */
+  const [pagination, setPagination] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -15,16 +25,25 @@ export function ScannersList() {
     setError("");
     setLoading(true);
     try {
-      const res = await api.listScanners(
-        filterType ? { type: filterType, limit: 100 } : { limit: 100 },
-      );
+      const params = {
+        page,
+        limit: DEFAULT_LIST_PAGE_SIZE,
+        ...(filterType ? { type: filterType } : {}),
+      };
+      const res = await api.listScanners(params);
       setItems(res.data || []);
+      const pag = parsePaginationFromResponse(res);
+      setPagination(pag);
+      const clamped = clampPageToTotalPages(page, pag);
+      if (pag && clamped !== page) {
+        setPage(clamped);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [filterType]);
+  }, [filterType, page]);
 
   useEffect(() => {
     load();
@@ -51,6 +70,8 @@ export function ScannersList() {
     ? `No ${SCANNER_TYPE_LABELS[filterType] || filterType} scanners yet.`
     : null;
 
+  const showPager = shouldRenderPagination(pagination);
+
   return (
     <div className="scanners-page">
       <aside className="scanners-page__types" aria-label="Filter by scan type">
@@ -60,7 +81,10 @@ export function ScannersList() {
             <button
               type="button"
               className={`scanner-type-list__item${filterType === null ? " scanner-type-list__item--active" : ""}`}
-              onClick={() => setFilterType(null)}
+              onClick={() => {
+                setFilterType(null);
+                setPage(1);
+              }}
             >
               All types
             </button>
@@ -70,7 +94,10 @@ export function ScannersList() {
               <button
                 type="button"
                 className={`scanner-type-list__item${filterType === t ? " scanner-type-list__item--active" : ""}`}
-                onClick={() => setFilterType(t)}
+                onClick={() => {
+                  setFilterType(t);
+                  setPage(1);
+                }}
               >
                 {SCANNER_TYPE_LABELS[t] || t}
               </button>
@@ -79,7 +106,7 @@ export function ScannersList() {
         </ul>
       </aside>
 
-      <div className="scanners-page__main panel">
+      <div className={`scanners-page__main panel${showPager ? " panel--list-pager-fill" : ""}`}>
         <div className="panel__head">
           <h1 className="panel__title">
             Scanners
@@ -92,44 +119,51 @@ export function ScannersList() {
           </Link>
         </div>
         {error ? <p className="form-error">{error}</p> : null}
-        {loading ? <p className="muted">Loading…</p> : null}
-        {!loading && !items.length ? (
-          filterType ? (
-            <p className="muted empty-state">{emptyMessage}</p>
-          ) : (
-            <pre className="empty-state mono">
+        <div className={`list-pager-stack${showPager ? " list-pager-stack--fill" : ""}`}>
+          <div className="list-pager-stack__scroll">
+            {loading ? <p className="muted">Loading…</p> : null}
+            {!loading && !items.length ? (
+              filterType ? (
+                <p className="muted empty-state">{emptyMessage}</p>
+              ) : (
+                <pre className="empty-state mono">
 {`┌─────────────────────────────────────┐
 │  No scanners yet.                   │
 │  Add Docker, SAST, or cloud scans.  │
 └─────────────────────────────────────┘`}
-            </pre>
-          )
-        ) : null}
-        <ul className="secret-list">
-          {items.map((row) => (
-            <li key={row._id} className="secret-list__row">
-              <div>
-                <Link to={`/dashboard/scanners/${row._id}`} className="secret-list__name">
-                  {row.name}
-                </Link>
-                <div className="muted mono secret-list__meta">
-                  {SCANNER_TYPE_LABELS[row.type] || row.type} · {new Date(row.createdAt).toLocaleString()}
-                </div>
-              </div>
-              <div className="secret-list__actions">
-                <Link className="btn btn--small btn--ghost" to={`/dashboard/scanners/${row._id}`}>
-                  Open
-                </Link>
-                <Link className="btn btn--small btn--ghost" to={`/dashboard/scanners/${row._id}/edit`}>
-                  Edit
-                </Link>
-                <button type="button" className="btn btn--small btn--danger" onClick={() => onDelete(row._id, row.name)}>
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                </pre>
+              )
+            ) : null}
+            {!loading && items.length ? (
+              <ul className="secret-list">
+                {items.map((row) => (
+                  <li key={row._id} className="secret-list__row">
+                    <div>
+                      <Link to={`/dashboard/scanners/${row._id}`} className="secret-list__name">
+                        {row.name}
+                      </Link>
+                      <div className="muted mono secret-list__meta">
+                        {SCANNER_TYPE_LABELS[row.type] || row.type} · {new Date(row.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="secret-list__actions">
+                      <Link className="btn btn--small btn--ghost" to={`/dashboard/scanners/${row._id}`}>
+                        Open
+                      </Link>
+                      <Link className="btn btn--small btn--ghost" to={`/dashboard/scanners/${row._id}/edit`}>
+                        Edit
+                      </Link>
+                      <button type="button" className="btn btn--small btn--danger" onClick={() => onDelete(row._id, row.name)}>
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <ListPagination pagination={pagination} onPageChange={setPage} ariaLabel="Scanner list pages" />
+        </div>
       </div>
     </div>
   );
