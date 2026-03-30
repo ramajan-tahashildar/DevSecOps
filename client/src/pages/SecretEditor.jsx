@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
+import { useToast } from "../components/ToastContext";
 import { SECRET_FIELD_MAP, SECRET_TYPE_LABELS } from "../secretTypes";
 
 const TYPES = Object.keys(SECRET_FIELD_MAP);
@@ -18,7 +19,7 @@ export function SecretEditor() {
   const [name, setName] = useState("");
   const [type, setType] = useState("aws");
   const [credentials, setCredentials] = useState(() => emptyCredentials("aws"));
-  const [error, setError] = useState("");
+  const toast = useToast();
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
 
@@ -26,7 +27,6 @@ export function SecretEditor() {
     if (isCreate) return;
     let cancelled = false;
     (async () => {
-      setError("");
       setLoading(true);
       try {
         const res = await api.getSecret(id);
@@ -36,7 +36,7 @@ export function SecretEditor() {
         setType(d.type);
         setCredentials({ ...emptyCredentials(d.type), ...d.credentials });
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) toast.error(err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -65,18 +65,19 @@ export function SecretEditor() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    setError("");
     setSaving(true);
     try {
       const payload = { name: name.trim(), type, credentials };
       if (isCreate) {
         await api.createSecret(payload);
+        toast.success("Secret created.");
       } else {
         await api.updateSecret(id, payload);
+        toast.success("Secret saved.");
       }
       navigate("/dashboard/secrets");
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -94,7 +95,7 @@ export function SecretEditor() {
           ← Back
         </Link>
       </div>
-      <form className="form" onSubmit={onSubmit}>
+      <form className="form" onSubmit={onSubmit} noValidate>
         <label className="field">
           <span>Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. prod-aws-scanner" />
@@ -134,7 +135,6 @@ export function SecretEditor() {
             )}
           </label>
         ))}
-        {error ? <p className="form-error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="btn btn--primary" disabled={saving}>
             {saving ? "Saving…" : isCreate ? "Create" : "Save"}

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { ConfirmDialogProvider } from "./components/ConfirmDialog";
+import { ToastProvider } from "./components/ToastContext";
 import { DashboardShell } from "./components/DashboardShell";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Landing } from "./pages/Landing";
@@ -67,11 +68,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ConfirmDialogProvider>
-          <div className="app-root">
-            <AppRoutes />
-          </div>
-        </ConfirmDialogProvider>
+        <ToastProvider>
+          <ConfirmDialogProvider>
+            <div className="app-root">
+              <AppRoutes />
+            </div>
+          </ConfirmDialogProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

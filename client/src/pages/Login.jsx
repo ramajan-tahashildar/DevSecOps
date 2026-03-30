@@ -35,7 +35,7 @@ export function Login() {
         <header className="auth-card__header">
           <h1 className="auth-card__title">Sign in</h1>
         </header>
-        <form className="form" onSubmit={onSubmit}>
+        <form className="form" onSubmit={onSubmit} noValidate>
           <label className="field">
             <span>Email</span>
             <input

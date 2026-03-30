@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import * as api from "../api";
 import { ListPagination } from "../components/ListPagination";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useToast } from "../components/ToastContext";
 import { SECRET_TYPE_LABELS } from "../secretTypes";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -13,6 +14,7 @@ import {
 
 export function SecretsList() {
   const confirm = useConfirm();
+  const toast = useToast();
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
   /** @type {import("../utils/pagination").ApiPagination | null} */
@@ -34,6 +36,7 @@ export function SecretsList() {
       }
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -56,9 +59,11 @@ export function SecretsList() {
     if (!ok) return;
     try {
       await api.deleteSecret(id);
+      toast.success("Secret deleted.");
       await load();
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     }
   }
 

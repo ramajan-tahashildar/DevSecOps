@@ -56,7 +56,7 @@ export function Signup() {
         <header className="auth-card__header">
           <h1 className="auth-card__title">Create account</h1>
         </header>
-        <form className="form form--grid" onSubmit={onSubmit}>
+        <form className="form form--grid" onSubmit={onSubmit} noValidate>
           <label className="field">
             <span>First name</span>
             <input value={form.firstName} onChange={setField("firstName")} required />

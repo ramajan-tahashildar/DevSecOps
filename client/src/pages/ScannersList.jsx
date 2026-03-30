@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import * as api from "../api";
 import { ListPagination } from "../components/ListPagination";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useToast } from "../components/ToastContext";
 import { SCANNER_TYPE_LABELS, SCANNER_TYPES } from "../scannerTypes";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -13,6 +14,7 @@ import {
 
 export function ScannersList() {
   const confirm = useConfirm();
+  const toast = useToast();
   const [filterType, setFilterType] = useState(null);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
@@ -40,6 +42,7 @@ export function ScannersList() {
       }
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -60,9 +63,11 @@ export function ScannersList() {
     if (!ok) return;
     try {
       await api.deleteScanner(id);
+      toast.success("Scanner deleted.");
       await load();
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     }
   }
 

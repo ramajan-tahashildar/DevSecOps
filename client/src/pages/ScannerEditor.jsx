@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
+import { useToast } from "../components/ToastContext";
 import {
+  CLOUD_REGIONS,
+  CLOUD_SERVICES,
   DOCKER_REGISTRIES,
   SAST_TOOLS,
   SCANNER_TYPE_LABELS,
@@ -21,7 +24,7 @@ function emptyForm(type) {
     dockerRegistry: "dockerhub",
     isPrivate: false,
     region: "",
-    servicesInput: "",
+    selectedServices: [],
   };
 }
 
@@ -31,6 +34,10 @@ function formFromScanner(d) {
   const dc = d.dockerConfig || {};
   const sc = d.sastConfig || {};
   const cc = d.cloudConfig || {};
+  const allowedCloud = new Set((CLOUD_SERVICES[type] || []).map((o) => o.value));
+  const selectedServices = Array.isArray(cc.services)
+    ? cc.services.filter((s) => typeof s === "string" && allowedCloud.has(s))
+    : [];
   return {
     name: d.name || "",
     type,
@@ -43,7 +50,7 @@ function formFromScanner(d) {
     dockerRegistry: dc.registry || "dockerhub",
     isPrivate: Boolean(dc.isPrivate),
     region: cc.region || "",
-    servicesInput: Array.isArray(cc.services) ? cc.services.join(", ") : "",
+    selectedServices,
   };
 }
 
@@ -83,10 +90,7 @@ function buildPayload(form) {
     };
   }
 
-  const services = form.servicesInput
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const services = Array.isArray(form.selectedServices) ? [...form.selectedServices] : [];
   const cloudConfig = {
     provider: form.type,
     services,
@@ -111,13 +115,13 @@ export function ScannerEditor() {
   const [form, setForm] = useState(() => emptyForm("docker"));
   const type = form.type;
   const [secrets, setSecrets] = useState([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
   const [sastBranches, setSastBranches] = useState([]);
   const [sastBranchesLoading, setSastBranchesLoading] = useState(false);
   const [sastBranchesError, setSastBranchesError] = useState("");
 
+  const toast = useToast();
   const gitSecrets = useMemo(() => secrets.filter((s) => s.type === "git"), [secrets]);
 
   useEffect(() => {
@@ -139,7 +143,6 @@ export function ScannerEditor() {
     if (isCreate) return;
     let cancelled = false;
     (async () => {
-      setError("");
       setLoading(true);
       try {
         const res = await api.getScanner(id);
@@ -147,7 +150,7 @@ export function ScannerEditor() {
         if (cancelled) return;
         setForm(formFromScanner(d));
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) toast.error(err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -211,7 +214,19 @@ export function ScannerEditor() {
     return [...u].sort((a, b) => a.localeCompare(b));
   }, [sastBranches, form.branch]);
 
+  const isCloud = form.type === "aws" || form.type === "azure" || form.type === "gcp";
+  const cloudServiceOptions = useMemo(() => CLOUD_SERVICES[form.type] || [], [form.type]);
+  const cloudRegionOptions = useMemo(() => {
+    const list = CLOUD_REGIONS[form.type] || [];
+    if (!form.region) return list;
+    if (list.some((o) => o.value === form.region)) return list;
+    return [{ value: form.region, label: `${form.region} — (custom)` }, ...list];
+  }, [form.type, form.region]);
+
   const clientError = useMemo(() => {
+    if (!form.name.trim()) {
+      return "Name is required.";
+    }
     if (form.type === "sast" && !form.repoUrl.trim()) {
       return "Repository URL is required for SAST scanners.";
     }
@@ -221,27 +236,49 @@ export function ScannerEditor() {
     if (form.type === "docker" && form.isPrivate && !form.secretId) {
       return "Select a vault secret for private registry authentication.";
     }
+    if (isCloud) {
+      if (!form.region.trim()) {
+        return "Select a region.";
+      }
+      if (!Array.isArray(form.selectedServices) || form.selectedServices.length === 0) {
+        return "Select at least one service.";
+      }
+      if (!form.secretId) {
+        return "Select a vault secret.";
+      }
+    }
     return "";
-  }, [form.type, form.repoUrl, form.isPrivate, form.secretId, form.sastPrivateRepo]);
+  }, [
+    form.name,
+    form.type,
+    isCloud,
+    form.repoUrl,
+    form.isPrivate,
+    form.secretId,
+    form.sastPrivateRepo,
+    form.selectedServices,
+    form.region,
+  ]);
 
   async function onSubmit(e) {
     e.preventDefault();
     if (clientError) {
-      setError(clientError);
+      toast.warning(clientError);
       return;
     }
-    setError("");
     setSaving(true);
     try {
       const payload = buildPayload(form);
       if (isCreate) {
         await api.createScanner(payload);
+        toast.success("Scanner created.");
       } else {
         await api.updateScanner(id, payload);
+        toast.success("Scanner saved.");
       }
       navigate(isCreate ? "/dashboard/scanners" : `/dashboard/scanners/${id}`);
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -259,13 +296,12 @@ export function ScannerEditor() {
           ← Back
         </Link>
       </div>
-      <form className="form" onSubmit={onSubmit}>
+      <form className="form" onSubmit={onSubmit} noValidate>
         <label className="field">
           <span>Name</span>
           <input
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            required
             placeholder="e.g. prod-image-semgrep"
           />
         </label>
@@ -419,20 +455,47 @@ export function ScannerEditor() {
           </>
         ) : null}
 
-        {form.type === "aws" || form.type === "azure" || form.type === "gcp" ? (
+        {isCloud ? (
           <>
             <label className="field">
               <span>Region</span>
-              <input value={form.region} onChange={(e) => set("region", e.target.value)} placeholder="e.g. us-east-1" />
+              <select value={form.region} onChange={(e) => set("region", e.target.value)}>
+                <option value="">— Select region —</option>
+                {cloudRegionOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </label>
-            <label className="field">
-              <span>Services (comma-separated)</span>
-              <input
-                value={form.servicesInput}
-                onChange={(e) => set("servicesInput", e.target.value)}
-                placeholder="e.g. s3, lambda"
-              />
-            </label>
+            <div className="field">
+              <span>Services</span>
+              <p className="muted small cloud-services-hint">
+                Select one or more services for {SCANNER_TYPE_LABELS[form.type] || form.type}.
+              </p>
+              <div className="cloud-services-grid" role="group" aria-label="Cloud services">
+                {cloudServiceOptions.map((opt) => (
+                  <label key={opt.value} className="cloud-services-grid__item">
+                    <input
+                      type="checkbox"
+                      checked={form.selectedServices.includes(opt.value)}
+                      onChange={() => {
+                        const id = opt.value;
+                        setForm((f) => {
+                          const has = f.selectedServices.includes(id);
+                          const next = has
+                            ? f.selectedServices.filter((s) => s !== id)
+                            : [...f.selectedServices, id];
+                          next.sort((a, b) => a.localeCompare(b));
+                          return { ...f, selectedServices: next };
+                        });
+                      }}
+                    />
+                    <span className="cloud-services-grid__text">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </>
         ) : null}
 
@@ -443,10 +506,15 @@ export function ScannerEditor() {
                 <span>
                   {form.type === "docker" && form.isPrivate
                     ? "Vault secret (required for private registry)"
-                    : "Vault secret (optional)"}
+                    : isCloud
+                      ? "Vault secret (required)"
+                      : "Vault secret (optional)"}
                 </span>
-                <select value={form.secretId} onChange={(e) => set("secretId", e.target.value)}>
-                  <option value="">— None —</option>
+                <select
+                  value={form.secretId}
+                  onChange={(e) => set("secretId", e.target.value)}
+                >
+                  <option value="">{isCloud ? "— Select vault secret —" : "— None —"}</option>
                   {secrets.map((s) => (
                     <option key={s._id} value={s._id}>
                       {s.name}
@@ -456,11 +524,8 @@ export function ScannerEditor() {
               </label>
             ) : null}
 
-        {error ? <p className="form-error">{error}</p> : null}
-        {clientError && !error ? <p className="form-error">{clientError}</p> : null}
-
         <div className="form__actions">
-          <button type="submit" className="btn btn--primary" disabled={saving || Boolean(clientError)}>
+          <button type="submit" className="btn btn--primary" disabled={saving}>
             {saving ? "Saving…" : isCreate ? "Create" : "Save"}
           </button>
         </div>

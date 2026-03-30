@@ -1,5 +1,9 @@
 import { ObjectId } from "mongodb";
 import { COLLECTIONS } from "../../../constants/collections.js";
+import {
+  cloudRegionsSetForProvider,
+  cloudServicesSetForProvider,
+} from "../../../constants/cloudServices.js";
 import { connectDb } from "../../../db/client.js";
 import {
   parsePaginationQuery,
@@ -13,6 +17,33 @@ const CLOUD_PROVIDERS = new Set(["aws", "azure", "gcp"]);
 
 function isNonEmptyString(v) {
   return typeof v === "string" && v.trim().length > 0;
+}
+
+/**
+ * Cloud scanners (aws/azure/gcp) require provider, region, ≥1 service, vault secret.
+ * @param {{ type: string; cloudConfig?: object; secretId?: import("mongodb").ObjectId | null }} payload
+ * @returns {string | null} Error message or null if valid.
+ */
+function validateCloudScannerComplete(payload) {
+  if (!CLOUD_PROVIDERS.has(payload.type)) return null;
+  const cc = payload.cloudConfig || {};
+  if (!cc.provider || !CLOUD_PROVIDERS.has(cc.provider)) {
+    return "cloudConfig.provider is required and must be aws, azure, or gcp.";
+  }
+  if (cc.provider !== payload.type) {
+    return "cloudConfig.provider must match scanner type.";
+  }
+  if (!isNonEmptyString(cc.region)) {
+    return "Region is required.";
+  }
+  const services = cc.services;
+  if (!Array.isArray(services) || services.length === 0) {
+    return "Select at least one service.";
+  }
+  if (!payload.secretId) {
+    return "Vault secret is required.";
+  }
+  return null;
 }
 
 function pickSource(body) {
@@ -61,15 +92,51 @@ function pickCloudConfig(body) {
   const c = body?.cloudConfig;
   if (!c || typeof c !== "object") return {};
   const out = {};
+  const providerFromConfig =
+    typeof c.provider === "string" && CLOUD_PROVIDERS.has(c.provider) ? c.provider : null;
+  const providerFromType =
+    typeof body?.type === "string" && CLOUD_PROVIDERS.has(body.type) ? body.type : null;
+  if (providerFromConfig && providerFromType && providerFromConfig !== providerFromType) {
+    return { error: "cloudConfig.provider must match scanner type" };
+  }
   if (typeof c.provider === "string") {
     if (!CLOUD_PROVIDERS.has(c.provider)) {
       return { error: `cloudConfig.provider must be one of: ${[...CLOUD_PROVIDERS].join(", ")}` };
     }
     out.provider = c.provider;
   }
-  if (typeof c.region === "string") out.region = c.region.trim() || undefined;
+  if (typeof c.region === "string") {
+    const r = c.region.trim();
+    const effectiveProvider = providerFromConfig || providerFromType;
+    if (r && effectiveProvider) {
+      const allowedRegions = cloudRegionsSetForProvider(effectiveProvider);
+      if (allowedRegions && !allowedRegions.has(r)) {
+        return { error: `Invalid region for ${effectiveProvider}: ${r}` };
+      }
+    }
+    out.region = r || undefined;
+  }
   if (Array.isArray(c.services)) {
-    out.services = c.services.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+    const raw = c.services.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+    const effectiveProvider = providerFromConfig || providerFromType;
+    if (raw.length > 0) {
+      if (!effectiveProvider) {
+        return {
+          error:
+            "cloudConfig.provider or scanner type (aws|azure|gcp) is required when cloudConfig.services is set",
+        };
+      }
+      const allowed = cloudServicesSetForProvider(effectiveProvider);
+      if (!allowed) {
+        return { error: `Unknown cloud provider for services: ${effectiveProvider}` };
+      }
+      for (const s of raw) {
+        if (!allowed.has(s)) {
+          return { error: `Invalid cloud service for ${effectiveProvider}: ${s}` };
+        }
+      }
+    }
+    out.services = raw;
   }
   return { value: out };
 }
@@ -220,6 +287,11 @@ function buildScannerPayload(body, { partial } = { partial: false }) {
     !partial
   ) {
     return { error: "secretId is required when docker registry is private" };
+  }
+
+  if (!partial) {
+    const cloudErr = validateCloudScannerComplete(payload);
+    if (cloudErr) return { error: cloudErr };
   }
 
   return { value: payload };
@@ -386,6 +458,10 @@ export async function updateScanner(req, res) {
     }
 
     const mergedDocker = { ...(existing.dockerConfig || {}), ...(updates.dockerConfig || {}) };
+    const mergedCloud = { ...(existing.cloudConfig || {}), ...(updates.cloudConfig || {}) };
+    if (CLOUD_PROVIDERS.has(mergedType) && !mergedCloud.provider) {
+      mergedCloud.provider = mergedType;
+    }
     const mergedSecretId =
       updates.secretId !== undefined ? updates.secretId : existing.secretId;
 
@@ -400,6 +476,17 @@ export async function updateScanner(req, res) {
       });
     }
 
+    if (CLOUD_PROVIDERS.has(mergedType)) {
+      const cloudErr = validateCloudScannerComplete({
+        type: mergedType,
+        cloudConfig: mergedCloud,
+        secretId: mergedSecretId,
+      });
+      if (cloudErr) {
+        return res.status(400).json({ success: false, message: cloudErr });
+      }
+    }
+
     const now = new Date();
     const $set = { updatedAt: now };
     if (updates.name !== undefined) $set.name = updates.name;
@@ -412,7 +499,7 @@ export async function updateScanner(req, res) {
       $set.sastConfig = { ...(existing.sastConfig || {}), ...updates.sastConfig };
     }
     if (updates.cloudConfig !== undefined) {
-      $set.cloudConfig = { ...(existing.cloudConfig || {}), ...updates.cloudConfig };
+      $set.cloudConfig = mergedCloud;
     }
     if (updates.secretId !== undefined) {
       $set.secretId = updates.secretId;
