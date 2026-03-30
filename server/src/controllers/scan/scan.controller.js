@@ -3,6 +3,7 @@ import { COLLECTIONS } from "../../constants/collections.js";
 import { connectDb } from "../../db/client.js";
 import { runDockerScan } from "../../services/scan/dockerScan.service.js";
 import { runSastScan } from "../../services/scan/sastScan.service.js";
+import { runAwsScan } from "../../services/scan/awsScan.service.js";
 import { parsePaginationQuery, paginationMeta } from "../../utils/pagination.js";
 
 /**
@@ -56,6 +57,8 @@ export async function runScanHandler(req, res) {
       report = await runDockerScan(scannerId, req.user.id, scanner);
     } else if (scanType === "sast") {
       report = await runSastScan(scannerId, req.user.id, scanner);
+    } else if (scanType === "aws") {
+      report = await runAwsScan(scannerId, req.user.id, scanner);
     } else {
       return res.status(400).json({
         success: false,
@@ -96,7 +99,14 @@ export async function runScanHandler(req, res) {
       message.includes("Semgrep failed") ||
       message.includes("ESLint failed") ||
       message.includes("invalid JSON") ||
-      message.includes("SAST tool produced invalid JSON");
+      message.includes("SAST tool produced invalid JSON") ||
+      message.includes("not an AWS scanner") ||
+      message.includes("cloudConfig.region is required") ||
+      message.includes("cloudConfig.services must be a non-empty array") ||
+      message.includes("secretId is required for AWS scans") ||
+      message.includes("expected aws accessKey/secretKey") ||
+      message.includes("Secret must include accessKey and secretKey") ||
+      message.includes("Invalid cloud service for aws:");
 
     const serviceUnavailable =
       message.includes("Trivy is not installed") ||
@@ -264,11 +274,11 @@ export async function getScannerScanState(req, res) {
         /** Latest stored report (proves a completed scan produced output) */
         latestReport: latestReport
           ? {
-              _id: latestReport._id.toString(),
-              type: latestReport.type,
-              createdAt: latestReport.createdAt,
-              summary: latestReport.summary ?? null,
-            }
+            _id: latestReport._id.toString(),
+            type: latestReport.type,
+            createdAt: latestReport.createdAt,
+            summary: latestReport.summary ?? null,
+          }
           : null,
       },
     });

@@ -57,6 +57,10 @@ function targetLabel(target) {
   if (!target || typeof target !== "object") return "—";
   if (target.imageName) return target.imageName;
   if (target.repoUrl) return target.repoUrl;
+  if (target.provider && Array.isArray(target.services)) {
+    const svcs = target.services.join(", ");
+    return target.region ? `${target.provider} · ${target.region} · ${svcs}` : `${target.provider} · ${svcs}`;
+  }
   try {
     return JSON.stringify(target);
   } catch {
@@ -183,7 +187,9 @@ export function ScannerReports() {
       /* keep null; deriveClientPendingScan still uses sessionStorage */
     }
     const canRun =
-      scannerData?.type === "docker" || scannerData?.type === "sast";
+      scannerData?.type === "docker" ||
+      scannerData?.type === "sast" ||
+      scannerData?.type === "aws";
     setClientPendingScan(deriveClientPendingScan(id, canRun, runningSnapshot, hintForPending));
     setLoading(false);
   }, [id, refreshReports, fetchTimeline]);
@@ -234,7 +240,7 @@ export function ScannerReports() {
   }
 
   const canRunScan =
-    scanner?.type === "docker" || scanner?.type === "sast";
+    scanner?.type === "docker" || scanner?.type === "sast" || scanner?.type === "aws";
 
   /** Reconcile sessionStorage pending when poll updates job or newest timeline row. */
   useEffect(() => {
@@ -314,7 +320,7 @@ export function ScannerReports() {
             onClick={onGenerateReport}
             title={
               !canRunScan
-                ? "Generate report is available for container and SAST (repository) scanners only."
+                ? "Generate report is available for container, SAST (repository), and AWS cloud scanners only."
                 : undefined
             }
           >
