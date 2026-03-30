@@ -1,0 +1,26 @@
+# Copy server env vars into a project-root `.env` (gitignored) or export them before `docker compose up`.
+# Web proxies /api and /health to the API (nginx upstream host `api` matches this service name).
+services:
+  api:
+    build: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY}
+      PORT: "3000"
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8080}
+
+  web:
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: ""
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    environment:
+      API_HOST: api
+      API_PORT: "3000"
