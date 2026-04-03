@@ -967,6 +967,25 @@ a:hover {
   box-sizing: border-box;
 }
 
+.scanner-report-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.scanner-report-row__head-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scanner-report-row__download {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .scanner-report-row__details {
   margin-top: 0.5rem;
   max-width: 100%;

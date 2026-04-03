@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as scannerListController from "../controllers/scanner/scanner-list/scanner-list.controller.js";
+import * as scannerListController from "../controllers/scanner/scanner-list.controller.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();

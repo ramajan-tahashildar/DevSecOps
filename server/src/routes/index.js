@@ -17,6 +17,11 @@ router.get("/reports/by-repo", requireAuth, scanController.getReportsByRepoUrl);
 router.get("/scan-state", requireAuth, scanController.getScannerScanState);
 /** Register before `/scanners` sub-router so `GET …/reports` and `POST …/run` are never shadowed. */
 router.get("/scanners/:scannerId/reports", requireAuth, scanController.getScannerReports);
+router.get(
+  "/scanners/:scannerId/reports/:reportId/download",
+  requireAuth,
+  scanController.downloadScannerReport,
+);
 router.get("/scanners/:scannerId/scan-state", requireAuth, scanController.getScannerScanState);
 router.get(
   "/scanners/:scannerId/branches",

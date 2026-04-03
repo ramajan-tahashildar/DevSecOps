@@ -1,14 +1,14 @@
 import { ObjectId } from "mongodb";
-import { COLLECTIONS } from "../../../constants/collections.js";
+import { COLLECTIONS } from "../../constants/collections.js";
 import {
   cloudRegionsSetForProvider,
   cloudServicesSetForProvider,
-} from "../../../constants/cloudServices.js";
-import { connectDb } from "../../../db/client.js";
+} from "../../constants/cloudServices.js";
+import { connectDb } from "../../db/client.js";
 import {
   parsePaginationQuery,
   paginationMeta,
-} from "../../../utils/pagination.js";
+} from "../../utils/pagination.js";
 
 const SCANNER_TYPES = new Set(["docker", "sast", "aws", "azure", "gcp"]);
 const DOCKER_REGISTRIES = new Set(["dockerhub", "ecr", "gcr", "acr", "private"]);

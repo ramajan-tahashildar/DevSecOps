@@ -1,2 +1,2 @@
-export { runDockerScan, resolveLatestTag } from "./scan/dockerScan.service.js";
-export { runSastScan } from "./scan/sastScan.service.js";
+export { runDockerScan, resolveLatestTag } from "../controllers/scanner/dockerScan.service.js";
+export { runSastScan } from "../controllers/scanner/sastScan.service.js";

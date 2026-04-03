@@ -1,9 +1,9 @@
 import { ObjectId } from "mongodb";
 import { COLLECTIONS } from "../../constants/collections.js";
 import { connectDb } from "../../db/client.js";
-import { runDockerScan } from "../../services/scan/dockerScan.service.js";
-import { runSastScan } from "../../services/scan/sastScan.service.js";
-import { runAwsScan } from "../../services/scan/awsScan.service.js";
+import { runDockerScan } from "../scanner/dockerScan.service.js";
+import { runSastScan } from "../scanner/sastScan.service.js";
+import { runAwsScan } from "../scanner/awsScan.service.js";
 import { parsePaginationQuery, paginationMeta } from "../../utils/pagination.js";
 
 /**
@@ -429,6 +429,71 @@ export async function getScannerReports(req, res) {
       data,
       pagination: paginationMeta({ total, page, limit }),
     });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function safeFilenameSegment(v) {
+  return String(v ?? "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export async function downloadScannerReport(req, res) {
+  try {
+    const { scannerId, reportId } = req.params;
+    if (!ObjectId.isValid(scannerId)) {
+      return res.status(400).json({ success: false, message: "Invalid scanner id" });
+    }
+    if (!ObjectId.isValid(reportId)) {
+      return res.status(400).json({ success: false, message: "Invalid report id" });
+    }
+
+    const db = await connectDb();
+    const userOid = new ObjectId(req.user.id);
+    const scannerOid = new ObjectId(scannerId);
+    const reportOid = new ObjectId(reportId);
+
+    const scanner = await db.collection(COLLECTIONS.SCANNERS).findOne({
+      _id: scannerOid,
+      userId: userOid,
+      isActive: true,
+    });
+    if (!scanner) {
+      return res.status(404).json({ success: false, message: "Scanner not found" });
+    }
+
+    const doc = await db.collection(COLLECTIONS.SCAN_REPORTS).findOne({
+      _id: reportOid,
+      scannerId: scannerOid,
+      userId: userOid,
+    });
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    const payload = {
+      kind: "report",
+      ...toScanReportResponse(doc, { includeFull: true }),
+    };
+
+    const created = payload.createdAt ? new Date(payload.createdAt) : null;
+    const datePart = created && !Number.isNaN(created.getTime())
+      ? created.toISOString().slice(0, 10)
+      : "unknown-date";
+    const typePart = safeFilenameSegment(payload.type || "report") || "report";
+    const name = `devsecops-${typePart}-${datePart}-${payload._id}.json`;
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+    res.status(200).send(JSON.stringify(payload, null, 2));
   } catch (err) {
     res.status(500).json({
       success: false,

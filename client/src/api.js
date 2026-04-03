@@ -106,6 +106,33 @@ export const listScannerReports = (scannerId, params = {}) => {
   return api(`/api/scanners/${scannerId}/reports${suffix}`);
 };
 
+export async function downloadScannerReport(scannerId, reportId) {
+  const url = `${base()}/api/scanners/${encodeURIComponent(scannerId)}/reports/${encodeURIComponent(reportId)}/download`;
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, { method: "GET", headers });
+  if (!res.ok) {
+    const body = await parseBody(res);
+    const msg =
+      body?.error ||
+      body?.message ||
+      (Array.isArray(body?.errors) ? body.errors.join("; ") : null) ||
+      res.statusText;
+    const err = new Error(msg || "Download failed");
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+
+  const blob = await res.blob();
+  const disp = res.headers.get("content-disposition") || "";
+  const m = /filename="([^"]+)"/i.exec(disp);
+  const filename = (m && m[1]) || `devsecops-report-${reportId}.json`;
+  return { blob, filename };
+}
+
 /** SAST reports for a repo (paginated). */
 export const listReportsByRepo = (params = {}) => {
   const q = new URLSearchParams();

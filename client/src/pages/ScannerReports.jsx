@@ -74,6 +74,8 @@ export function ScannerReports() {
   const [reports, setReports] = useState([]);
   const [error, setError] = useState("");
   const [reportsError, setReportsError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [downloadingId, setDownloadingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [banner, setBanner] = useState(null);
@@ -235,6 +237,27 @@ export function ScannerReports() {
     }
   }
 
+  async function onDownloadReport(report) {
+    if (!report?._id) return;
+    setDownloadError("");
+    setDownloadingId(report._id);
+    try {
+      const { blob, filename } = await api.downloadScannerReport(id, report._id);
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename || `devsecops-report-${report._id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objUrl), 0);
+    } catch (err) {
+      setDownloadError(err?.message || "Download failed");
+    } finally {
+      setDownloadingId("");
+    }
+  }
+
   function dismissFailedRow() {
     setRunRow(null);
   }
@@ -342,6 +365,7 @@ export function ScannerReports() {
         </p>
       ) : null}
       {reportsError ? <p className="form-error">{reportsError}</p> : null}
+      {downloadError ? <p className="form-error">{downloadError}</p> : null}
 
       <div className={`list-pager-stack${pagedTimeline ? " list-pager-stack--fill" : ""}`}>
         <h2 className="scanner-reports__heading">Reports</h2>
@@ -408,7 +432,20 @@ export function ScannerReports() {
                 ) : (
                   <li key={r._id} className="secret-list__row scanner-report-row">
                     <div className="scanner-report-row__main">
-                      <div className="secret-list__name mono">{new Date(r.createdAt).toLocaleString()}</div>
+                      <div className="scanner-report-row__head">
+                        <div className="secret-list__name mono scanner-report-row__head-title">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--small scanner-report-row__download"
+                          onClick={() => onDownloadReport(r)}
+                          disabled={downloadingId === r._id}
+                          title="Download report JSON"
+                        >
+                          {downloadingId === r._id ? "Downloading…" : "Download"}
+                        </button>
+                      </div>
                       <div className="muted mono secret-list__meta">
                         {targetLabel(r.target)} · {formatSummary(r.summary)}
                         {Array.isArray(r.vulnerabilities) ? ` · ${r.vulnerabilities.length} finding(s)` : null}
